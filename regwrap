@@ -1,33 +1,44 @@
-lm235 = function(formula, df, digits){
+regwrap = function(formula, df, digits, ci){
   require(tidyverse)
   require(mosaic)
   require(moderndive)
   require(knitr)
   require(kableExtra)
   options(scipen = 777)
-  reg = lm(formula, data = df)
-  regtab = reg %>% 
-    get_regression_table(digits = digits) %>% 
-    select(term, estimate, std_error, lower_ci, upper_ci) %>% 
-    rename(" " = "term", 
-           Estimate = "estimate", 
-           SE = "std_error", 
-           Lower = "lower_ci", 
-           Upper = "upper_ci")
-  regtab[1, 1] = "Intercept"
-  r2 = reg %>% rsquared() %>% round(digits)
-  rse = reg %>% sigma() %>% round(digits)
-  report = rbind(regtab, 
-                 c("R$^2$", r2, rep("--", 3)),
-                 c("RSE", rse, rep("--", 3))) %>% 
-    kable(caption = "Coefficients and Model Fit Statistics (w/ 95% CIs)", 
-          align = c('l', rep('r', 4)),
-          escape = F) %>% 
-    kable_classic_2(full_width = F)
-  # kable_paper(bootstrap_options = "striped", full_width = F) 
-  # row_spec(1:8, color = 'navy')
-  # nreport = nrow(report)
-  # report = report %>% 
-  #   row_spec(c(nreport-1, nreport), bold = T)
+  if(ci == "largesample"){
+    reg = lm(formula, data = df)
+    regtab = reg %>% 
+      get_regression_table(digits = digits) %>% 
+      select(term, estimate, lower_ci, upper_ci) %>% 
+      rename(name = "term", 
+             estimate = "estimate", 
+             lower = "lower_ci", 
+             upper = "upper_ci")
+    regtab[1, 1] = "Intercept"
+    r2 = reg %>% rsquared() %>% round(digits)
+    rse = reg %>% sigma() %>% round(digits)
+    report = rbind(regtab, 
+                   c("R$^2$", r2, rep("--", 2)),
+                   c("RSE", rse, rep("--", 2))) %>%
+      kable(caption = "Coefficients and Model Fit Statistics", 
+            align = c('l', rep('r', 3)),
+            escape = F) %>% 
+      kable_classic_2(full_width = F,
+                      lightable_options = "hover",
+                      html_font = "sans-serif")
+  }
+  else if(ci == "bootstrap"){
+    reg = do(5000)*lm(formula, data = resample(df))
+    report = confint(reg) %>% 
+      select(name, estimate, lower, upper) %>% 
+      filter(name != "F") %>% 
+      mutate_if(is.numeric, round, digits = digits) %>%
+      kable(caption = "Coefficients and Model Fit Statistics", 
+            align = c('l', rep('r', 3)),
+            escape = F) %>% 
+      kable_classic_2(full_width = F,
+                      lightable_options = "hover",
+                      html_font = "sans-serif")
+  }
   return(report)
 }
